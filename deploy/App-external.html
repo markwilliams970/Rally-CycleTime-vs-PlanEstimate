@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rally-CycleTime-vs-PlanEstimate</title>
+
+    <script type="text/javascript" src="https://rally1.rallydev.com/apps/2.0/sdk.js"></script>
+
+    <script type="text/javascript">
+        Rally.onReady(function () {
+                Ext.define("CustomApp",{extend:"Rally.app.App",componentCls:"app",items:[{xtype:"container",itemId:"iterationDropDown",columnWidth:1},{xtype:"container",itemId:"mychart",columnWidth:1}],_startingScheduleState:"In-Progress",_endingScheduleState:"Accepted",planEstimateHash:null,myChart:null,myChartText:null,iterationStore:null,snapshotStore:null,selectedIterationOIDs:[],launch:function(){var timeboxScope=this.getContext().getTimeboxScope();if(timeboxScope){var record=timeboxScope.getRecord(),name=record.get("Name");this.myIteration=record.data,this._onIterationSelect()}else this.down("#iterationDropDown").add({xtype:"rallyiterationcombobox",itemId:"iterationSelector",listeners:{select:this._onIterationSelect,ready:this._onIterationSelect,scope:this}})},onTimeboxScopeChange:function(newTimeboxScope){if(this.callParent(arguments),newTimeboxScope){var record=newTimeboxScope.getRecord();this.myIteration=record.data,this._onIterationSelect()}},_onIterationSelect:function(){var me=this,value;_.isUndefined(this.getContext().getTimeboxScope())&&(value=this.down("#iterationSelector").getRecord(),this.myIteration=value.data);var iterationName=value.get("Name");this.iterationStore=Ext.create("Rally.data.wsapi.Store",{model:"Iteration",autoLoad:!0,filters:[{property:"Name",operator:"=",value:iterationName}],context:{project:me.getContext().getProjectRef(),projectScopeUp:me.getContext().getProjectScopeUp(),projectScopeDown:me.getContext().getProjectScopeDown()},listeners:{load:function(store,data,success){me._iterationStoreLoaded(store,data,success,me)}},fetch:["Name","ObjectID"]})},_iterationStoreLoaded:function(store,data,success,scope){var me=scope;me.selectedIterationOIDs=[],Ext.Array.each(data,function(record){me.selectedIterationOIDs.push(record.get("ObjectID"))}),me._getSnapshotData(me)},_getSnapshotData:function(scope){var me=scope;me.setLoading("Querying snapshot data"),Ext.create("Rally.data.lookback.SnapshotStore",{limit:1/0,autoLoad:!0,listeners:{load:me._processSnapshotData,scope:me},fetch:["ObjectID","Name","Priority","ScheduleState","PlanEstimate","TaskEstimateTotal","TaskRemainingTotal"],hydrate:["ScheduleState"],compress:!0,removeUnauthorizedSnapshots:!0,filters:[{property:"_TypeHierarchy",operator:"in",value:["HierarchicalRequirement","Defect"]},{property:"Iteration",operator:"in",value:me.selectedIterationOIDs}]})},_processSnapshotData:function(store,data,success){var me=this;me.setLoading("Calculating Cycle Time");var workProductOIDs=[],snapshotsByWorkProductOID={},cycleTimeVsPlanEstimate=[];0===data.length&&(me.setLoading(!1),me._showChart(cycleTimeVsPlanEstimate)),Ext.Array.each(data,function(record){var thisObjectID=record.get("ObjectID");if(-1===workProductOIDs.indexOf(thisObjectID)){workProductOIDs.push(thisObjectID);var theseSnapshots=_.filter(data,function(thisRecord){return thisRecord.get("ObjectID")===thisObjectID});snapshotsByWorkProductOID[""+thisObjectID]=theseSnapshots}}),Ext.iterate(snapshotsByWorkProductOID,function(objectID,snapshots){var lastSnapshotStartState=_.last(Ext.Array.filter(snapshots,function(record){return record.get("ScheduleState")===me._startingScheduleState})),lastSnapshotEndState=_.last(Ext.Array.filter(snapshots,function(record){return record.get("ScheduleState")===me._endingScheduleState}));if(lastSnapshotStartState!==void 0&&lastSnapshotEndState!==void 0){var endStatePlanEstimate=lastSnapshotEndState.get("PlanEstimate"),startStateDateString=lastSnapshotStartState.get("_ValidFrom"),endStateDateString=lastSnapshotEndState.get("_ValidFrom"),cycleTime=Rally.util.DateTime.getDifference(new Date(endStateDateString),new Date(startStateDateString),"day");cycleTimeVsPlanEstimate.push([endStatePlanEstimate,cycleTime])}}),me._showChart(cycleTimeVsPlanEstimate)},_sortArrays:function(arr,sortArr){for(var result=[],i=0;arr.length>i;i++)result[i]=arr[sortArr[i]];return result},_stringArrayToIntArray:function(stringArray){var result=[];return Ext.Array.each(stringArray,function(thisString){result.push(parseInt(thisString,10))}),result},_showChart:function(data){var me=this;me.setLoading(!1);var chartDiv=this.down("#mychart");chartDiv.removeAll(),me.myChart&&me.myChart.destroy(),data.length>0?(me.myChart=Ext.create("Rally.ui.chart.Chart",{chartData:{series:[{type:"scatter",data:data,name:"CycleTime",color:"##00FF00"}]},chartConfig:{chart:{type:"scatter",zoomType:"xy"},title:{text:"Cycle Time Vs. Plan Estimate",align:"center"},xAxis:[{title:{enabled:!0,text:"Plan Estimate (Points)"},startOnTick:!0,endOnTick:!0,showLastLabel:!0}],yAxis:[{title:{enabled:!0,text:"Cycle Time (Days)",style:{fontWeight:"normal"}},min:0}]}}),me.myChart.setChartColors(["#00FF00"]),chartDiv.add(me.myChart),me.myChart._unmask()):chartDiv.add({xtype:"container",html:"Insufficient data for this iteration."})}});
+
+            Rally.launchApp('CustomApp', {
+                name:"Rally-CycleTime-vs-PlanEstimate",
+	            parentRepos:""
+            });
+
+        });
+    </script>
+
+
+    <style type="text/css">
+        
+    </style>
+</head>
+<body>
+</body>
+</html>
